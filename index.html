@@ -439,47 +439,22 @@ tr:hover td{background:#f0faf9}
   .photo-upload-wrap{grid-template-columns:1fr}
   .form-row-2{grid-template-columns:1fr}
   .hero-title-txt{font-size:1.6rem}
+  /* 탭: 한 줄에 다 들어가도록 아이콘+글자 세로배치 + 축소 (가로 스크롤 방지) */
+  .tabs{gap:0.2rem;padding:0.25rem}
+  .tab-btn{flex-direction:column;gap:0.15rem;padding:0.6rem 0.15rem;font-size:0.66rem;min-width:0;line-height:1.2}
+  .tab-btn i{font-size:0.95rem}
+  /* 캠퍼스 카드 그리드 여백 축소 */
+  .campus-grid{gap:0.35rem}
+  .campus-card{padding:0.75rem 0.3rem}
+  .campus-card .cc-count{font-size:1.6rem}
+  .campus-card .cc-name{font-size:0.62rem}
 }
+/* 가로 스크롤 방지 안전장치 */
+html,body{overflow-x:hidden;max-width:100%}
 </style>
 </head>
 <body onload="initApp()">
-<!-- ▼▼▼ 버셀 배포용 연결 장치 (이 블록만 추가) ▼▼▼ -->
-<script>
-(function(){
-  // 앱스스크립트(구글)에서 열리면 원래 방식, 버셀 등 외부에서 열리면 fetch 사용
-  if(location.hostname.indexOf("google") !== -1) return;
 
-  var API_URL = "/api/gas";
-  function makeRunner(){
-    var state = { ok:null, fail:null };
-    var proxy = new Proxy(state, {
-      get: function(t, prop){
-        if(prop === "withSuccessHandler") return function(fn){ t.ok = fn; return proxy; };
-        if(prop === "withFailureHandler") return function(fn){ t.fail = fn; return proxy; };
-        if(typeof prop !== "string") return undefined;
-        return function(){
-          var args = Array.prototype.slice.call(arguments);
-          fetch(API_URL, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action: prop, args: args }) })
-            .then(function(r){ return r.text(); })
-            .then(function(text){
-              var result; try { result = JSON.parse(text); } catch(e){ result = text; }
-              if(t.ok) t.ok(result);
-            })
-            .catch(function(err){
-              if(t.fail) t.fail(err); else console.error("API 오류:", err);
-            });
-        };
-      }
-    });
-    return proxy;
-  }
-
-  window.google = window.google || {};
-  window.google.script = window.google.script || {};
-  Object.defineProperty(window.google.script, "run", { get: makeRunner });
-})();
-</script>
-<!-- ▲▲▲ 여기까지 추가 ▲▲▲ -->
 <!-- Hero -->
 <div class="hero">
   <div class="logo-bar">
