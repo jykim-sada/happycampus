@@ -454,6 +454,43 @@ html,body{overflow-x:hidden;max-width:100%}
 </style>
 </head>
 <body onload="initApp()">
+<!-- ===== [Vercel 전용] Apps Script 통신 어댑터 ===== -->
+<!-- google.script.run 호출을 fetch(doPost)로 자동 전환합니다. -->
+<script>
+(function(){
+  // ▼▼▼ 여기에 Apps Script 웹앱 배포 주소(/exec)를 붙여넣으세요 ▼▼▼
+  var API_URL = "https://script.google.com/macros/s/AKfycbz0s5AYlaMBxJt3m87fx6QQfJp5Fn2SAYlvftAAqI6rVendCFNwG2KDBSo0WZoypgAX/exec";
+  // ▲▲▲ 예: https://script.google.com/macros/s/AKfycb..../exec ▲▲▲
+  function callApi(action, args){
+    return fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: action, args: args || [] })
+    }).then(function(r){ return r.json(); });
+  }
+  function createRunner(){
+    var state = { success: null, failure: null };
+    var proxy = new Proxy({}, {
+      get: function(_, prop){
+        if(prop === "withSuccessHandler") return function(fn){ state.success = fn; return proxy; };
+        if(prop === "withFailureHandler") return function(fn){ state.failure = fn; return proxy; };
+        if(prop === "withUserObject")     return function(){ return proxy; };
+        return function(){
+          var args = Array.prototype.slice.call(arguments);
+          callApi(prop, args)
+            .then(function(res){ if(state.success) state.success(res); })
+            .catch(function(err){ if(state.failure) state.failure(err); });
+          return proxy;
+        };
+      }
+    });
+    return proxy;
+  }
+  window.google = window.google || {};
+  window.google.script = window.google.script || {};
+  window.google.script.run = new Proxy({}, { get: function(_, prop){ return createRunner()[prop]; } });
+})();
+</script>
 
 <!-- Hero -->
 <div class="hero">
