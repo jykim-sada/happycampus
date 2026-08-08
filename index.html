@@ -449,8 +449,7 @@ tr:hover td{background:#f0faf9}
   // 앱스스크립트(구글)에서 열리면 원래 방식, 버셀 등 외부에서 열리면 fetch 사용
   if(location.hostname.indexOf("google") !== -1) return;
 
-  var API_URL = "https://script.google.com/macros/s/AKfycbz0s5AYlaMBxJt3m87fx6QQfJp5Fn2SAYlvftAAqI6rVendCFNwG2KDBSo0WZoypgAX/exec";
-
+  var API_URL = "/api/gas";
   function makeRunner(){
     var state = { ok:null, fail:null };
     var proxy = new Proxy(state, {
@@ -460,7 +459,7 @@ tr:hover td{background:#f0faf9}
         if(typeof prop !== "string") return undefined;
         return function(){
           var args = Array.prototype.slice.call(arguments);
-          fetch(API_URL, { method:"POST", body: JSON.stringify({ action: prop, args: args }) })
+          fetch(API_URL, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action: prop, args: args }) })
             .then(function(r){ return r.text(); })
             .then(function(text){
               var result; try { result = JSON.parse(text); } catch(e){ result = text; }
