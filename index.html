@@ -498,23 +498,45 @@ tr:hover td{background:#f0faf9}
 </style>
 </head>
 <body onload="initApp()">
-<!-- ▼▼▼ 버셀 배포용 연결 장치 (그대로) ▼▼▼ -->
+<!-- ▼▼▼ [Vercel/Apps Script 공용] 통신 어댑터 ▼▼▼ -->
 <script>
 (function(){
+  // Apps Script에서 직접 열면 네이티브 google.script.run 사용 (이 어댑터 무시)
   if(location.hostname.indexOf("google") !== -1) return;
-  var API_URL = "/api/gas";
+  // 그 외(Vercel 등)에서는 Apps Script 웹앱(/exec)로 직접 통신 → /api/gas 중계 안 거침(시간초과 해결)
+  var EXEC_URL = "https://script.google.com/macros/s/AKfycbz0s5AYlaMBxJt3m87fx6QQfJp5Fn2SAYlvftAAqI6rVendCFNwG2KDBSo0WZoypgAX/exec";
+
+  function callOnce(action, args){
+    return fetch(EXEC_URL, {
+      method: "POST",
+      // ★ 반드시 text/plain 이어야 CORS 프리플라이트 없이 통신됨 (application/json 쓰면 막힘)
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: action, args: args || [] })
+    }).then(function(r){ return r.text(); }).then(function(text){
+      var t = (text || "").trim();
+      if(t.charAt(0) !== "{" && t.charAt(0) !== "[") {
+        throw new Error("서버 응답 오류(JSON 아님)");  // HTML 등 비정상 응답은 오류로 처리
+      }
+      return JSON.parse(t);
+    });
+  }
+  // 콜드스타트/일시 오류 대비 1회 자동 재시도
+  function callApi(action, args){
+    return callOnce(action, args).catch(function(){ return callOnce(action, args); });
+  }
+
   function makeRunner(){
     var state = { ok:null, fail:null };
     var proxy = new Proxy(state, {
       get: function(t, prop){
         if(prop === "withSuccessHandler") return function(fn){ t.ok = fn; return proxy; };
         if(prop === "withFailureHandler") return function(fn){ t.fail = fn; return proxy; };
+        if(prop === "withUserObject")     return function(){ return proxy; };
         if(typeof prop !== "string") return undefined;
         return function(){
           var args = Array.prototype.slice.call(arguments);
-          fetch(API_URL, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ action: prop, args: args }) })
-            .then(function(r){ return r.text(); })
-            .then(function(text){ var result; try { result = JSON.parse(text); } catch(e){ result = text; } if(t.ok) t.ok(result); })
+          callApi(prop, args)
+            .then(function(result){ if(t.ok) t.ok(result); })
             .catch(function(err){ if(t.fail) t.fail(err); else console.error("API 오류:", err); });
         };
       }
