@@ -2032,11 +2032,18 @@ function submitActReport(){
   const startTime=document.getElementById('arStartTime').value;
   const endTime=document.getElementById('arEndTime').value;
   const memo=document.getElementById('arMemo')?.value||'';
-  if(!date||!type||!content){showToast('일자·유형·내용은 필수입니다','error');return;}
-  // 수정 모드 체크
   const saveBtn=document.querySelector('#actreportContent .btn-submit');
+  // ── 중복 저장 방지: 이미 저장 중이면 무시 ──
+  if(saveBtn&&saveBtn.disabled){ showToast('저장 중입니다. 잠시만 기다려주세요.','error'); return; }
+  if(!date||!type||!content){showToast('일자·유형·내용은 필수입니다','error');return;}
   const editRow=saveBtn?.dataset.editRow;
-  if(editRow){
+  const isEdit=!!editRow;
+  // 버튼 잠금 + 저장 중 표시
+  if(saveBtn){ saveBtn.disabled=true; saveBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> 저장 중...'; }
+  const resetToNew=()=>{ if(saveBtn){ saveBtn.disabled=false; saveBtn.innerHTML='<i class="fa-solid fa-paper-plane"></i> 활동 보고서 저장'; saveBtn.style.background=''; delete saveBtn.dataset.editRow; } };
+  const unlockKeepEdit=()=>{ if(saveBtn){ saveBtn.disabled=false; if(isEdit){ saveBtn.innerHTML='<i class="fa-solid fa-rotate"></i> 활동 보고서 수정 저장'; saveBtn.style.background='#f57c00'; } else { saveBtn.innerHTML='<i class="fa-solid fa-paper-plane"></i> 활동 보고서 저장'; } } };
+
+  if(isEdit){
     let durMin='';
     if(startTime&&endTime){
       const [sh,sm]=startTime.split(':').map(Number);
@@ -2045,18 +2052,16 @@ function submitActReport(){
     }
     google.script.run
       .withSuccessHandler(res=>{
-        if(res.success){
+        if(res&&res.success){
           showToast('수정되었습니다','success');
-          delete saveBtn.dataset.editRow;
-          saveBtn.innerHTML='<i class="fa-solid fa-paper-plane"></i> 활동 보고서 저장';
-          saveBtn.style.background='';
-          // 폼 초기화
+          resetToNew();
           ['arContent','arOutcome','arNextPlan','arMemo'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
           ['arStartTime','arEndTime'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
           document.getElementById('arDuration').textContent='시작·종료 시간 입력 시 자동 계산';
           loadActReports('all');
-        } else showToast('수정 실패: '+(res.error||''),'error');
+        } else { showToast('수정 실패: '+((res&&res.error)||''),'error'); unlockKeepEdit(); }
       })
+      .withFailureHandler(err=>{ showToast('수정 실패: '+err.message,'error'); unlockKeepEdit(); })
       .updateActReport(parseInt(editRow), currentUser, {date,type,startTime,endTime,durMin,place,content,outcome,nextPlan,memo});
     return;
   }
@@ -2067,7 +2072,7 @@ function submitActReport(){
   const save=(fileUrl,fileName)=>{
     google.script.run
       .withSuccessHandler(res=>{
-        if(res.success){
+        if(res&&res.success){
           showToast('활동 보고서가 저장되었습니다','success');
           document.getElementById('arContent').value='';
           document.getElementById('arOutcome').value='';
@@ -2079,9 +2084,11 @@ function submitActReport(){
           document.getElementById('arDuration').textContent='시작·종료 시간 입력 시 자동 계산';
           document.getElementById('arFileBox').innerHTML='<span style="font-size:13px;color:var(--muted)"><i class="fa-solid fa-paperclip"></i> 클릭하여 파일 선택</span>';
           if(document.getElementById('arMemo')) document.getElementById('arMemo').value='';
+          resetToNew();
           loadActReports();
-        } else showToast('저장 실패: '+(res.error||''),'error');
+        } else { showToast('저장 실패: '+((res&&res.error)||''),'error'); unlockKeepEdit(); }
       })
+      .withFailureHandler(err=>{ showToast('저장 실패: '+err.message,'error'); unlockKeepEdit(); })
       .saveActReport({consultantName:currentUser,date,type,place,content,outcome,nextPlan,memo,
         startTime,endTime,fileUrl:fileUrl||'',fileName:fileName||''});
   };
@@ -2093,11 +2100,13 @@ function submitActReport(){
       const b64=e.target.result.split(',')[1];
       google.script.run
         .withSuccessHandler(res=>{
-          if(res.success) save(res.fileUrl,res.fileName);
+          if(res&&res.success) save(res.fileUrl,res.fileName);
           else{ showToast('파일 업로드 실패','error'); save('',''); }
         })
+        .withFailureHandler(err=>{ showToast('파일 업로드 실패: '+err.message,'error'); unlockKeepEdit(); })
         .uploadFileToDrive(b64,file.name,file.type||'application/octet-stream');
     };
+    reader.onerror=()=>{ showToast('파일 읽기 실패','error'); unlockKeepEdit(); };
     reader.readAsDataURL(file);
   } else {
     save('','');
