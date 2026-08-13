@@ -12,16 +12,22 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{overflow-x:hidden;width:100%}
+body{width:100%;min-width:0;overflow-x:hidden;position:relative}
+img,video,iframe,table,textarea,input,select{max-width:100%}
 
 /* ── 모바일 기준 vw로 폰트 크기 결정 ── */
 html{
-  font-size:20px;
+  font-size:14px;
   scroll-behavior:smooth;
   -webkit-text-size-adjust:none !important;
   text-size-adjust:none !important;
 }
+@media(min-width:480px){
+  html{ font-size:15px; }
+}
 @media(min-width:769px){
-  html{ font-size:17px; }
+  html{ font-size:16px; }
 }
 
 :root{
@@ -29,18 +35,31 @@ html{
   --success:#8dc63f; --danger:#ef4444;
   --bg:#f2f9ee; --card:#fff;
   --text:#2d3748; --muted:#718096; --border:#b8dba0;
-  --radius:1.2rem;
+  --radius:0.9rem;
   --shadow:0 4px 24px rgba(0,169,157,.08);
   --shadow-lg:0 8px 40px rgba(0,169,157,.12);
-  /* rem 기반 사이즈 */
-  --fs-xs:1.05rem;
-  --fs-sm:1.25rem;
-  --fs-md:1.55rem;
-  --fs-lg:2.0rem;
-  --fs-xl:2.8rem;
-  --input-h:3.8rem;
-  --btn-h:4.2rem;
-  --gap:1.2rem;
+  /* 모바일 기준 축소 */
+  --fs-xs:0.75rem;
+  --fs-sm:0.85rem;
+  --fs-md:0.95rem;
+  --fs-lg:1.05rem;
+  --fs-xl:1.4rem;
+  --input-h:2.6rem;
+  --btn-h:3rem;
+  --gap:0.8rem;
+}
+@media(min-width:769px){
+  :root{
+    --fs-xs:0.8rem;
+    --fs-sm:0.9rem;
+    --fs-md:1rem;
+    --fs-lg:1.15rem;
+    --fs-xl:1.5rem;
+    --input-h:2.8rem;
+    --btn-h:3.2rem;
+    --gap:1rem;
+    --radius:1rem;
+  }
 }
 
 /* 초기 패널 숨김 - JS 실행 전 */
@@ -53,12 +72,14 @@ body{
   background:var(--bg);
   color:var(--text);
   font-size:var(--fs-sm);
+  width:100%;
+  min-width:0;
   min-height:100vh;
   -webkit-font-smoothing:antialiased;
 }
 
 /* Hero */
-.hero{background:linear-gradient(160deg,#c8e6a0 0%,#8fd16e 40%,#4caf7d 100%);padding:0 0 1.5rem;position:relative;overflow:hidden}
+.hero{background:linear-gradient(160deg,#c8e6a0 0%,#8fd16e 40%,#4caf7d 100%);padding:0 0 1rem;position:relative;overflow:hidden;width:100%}
 .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 30% 20%,rgba(255,255,255,.25) 0%,transparent 55%)}
 .hero::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2rem;background:#f2f9ee;clip-path:ellipse(55% 100% at 50% 100%)}
 
@@ -99,25 +120,27 @@ body{
 .campus-card .cc-icon{font-size:1.3rem;display:block;margin-bottom:0.1rem}
 
 /* Container */
-.container{width:100%;padding:1.5rem 1.2rem 6rem}
+.container{width:100%;max-width:100%;padding:1rem 0.8rem 6rem;box-sizing:border-box}
 
-/* Tabs */
-.tabs{display:flex;background:var(--card);border-radius:1rem;padding:0.35rem;box-shadow:var(--shadow);margin-bottom:1.2rem;gap:0.35rem}
-.tab-btn{flex:1;padding:1.5rem 0.5rem;border:none;background:transparent;border-radius:0.75rem;font-family:inherit;font-size:var(--fs-sm);font-weight:700;color:var(--muted);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:0.5rem}
-.tab-btn.active{background:linear-gradient(135deg,#2e7d32,#66bb6a);color:#fff;box-shadow:0 4px 14px rgba(232,132,90,.35)}
-.tab-btn i{font-size:var(--fs-md)}
+/* Tabs - 아이콘만 표시, 활성탭만 텍스트 표시 */
+.tabs{display:flex;width:100%;background:var(--card);border-radius:0.8rem;padding:0.2rem;box-shadow:var(--shadow);margin-bottom:0.8rem;gap:0.15rem;box-sizing:border-box;overflow:hidden}
+.tab-btn{flex:1;min-width:0;padding:0.55rem 0;border:none;background:transparent;border-radius:0.55rem;font-family:inherit;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.1rem;overflow:hidden;color:var(--muted)}
+.tab-btn i{font-size:1.05rem;line-height:1;flex-shrink:0}
+.tab-label{font-size:0.55rem;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block}
+.tab-btn.active{background:linear-gradient(135deg,#2e7d32,#66bb6a);color:#fff;box-shadow:0 3px 10px rgba(46,125,50,.3)}
+.tab-btn.active .tab-label{display:block}
 
 /* Card */
-.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:2rem 1.4rem;margin-bottom:1rem}
-.card-title{font-size:var(--fs-md);font-weight:700;color:var(--text);margin-bottom:1.2rem;display:flex;align-items:center;gap:0.7rem;word-break:keep-all}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:1rem 0.9rem;margin-bottom:0.7rem;min-width:0;overflow:hidden;width:100%;box-sizing:border-box}
+.card-title{font-size:0.95rem;font-weight:700;color:var(--text);margin-bottom:0.8rem;display:flex;align-items:center;gap:0.5rem;word-break:keep-all}
 .card-title i{width:2.2rem;height:2.2rem;background:linear-gradient(135deg,#2e7d32,#66bb6a);border-radius:0.6rem;display:flex;align-items:center;justify-content:center;color:#fff;font-size:var(--fs-sm);flex-shrink:0}
 
 /* Form */
-.form-stack{display:flex;flex-direction:column;gap:var(--gap)}
+.form-stack{display:flex;flex-direction:column;gap:0.65rem}
 .form-row-2{display:grid;grid-template-columns:1fr;gap:var(--gap)}
 .form-group{display:flex;flex-direction:column;gap:0.4rem}
 .form-label{font-size:var(--fs-xs);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-.form-control{height:var(--input-h);padding:0 0.9rem;border:2px solid var(--border);border-radius:0.75rem;font-family:inherit;font-size:var(--fs-md);color:var(--text);background:#fff;transition:border-color .2s,box-shadow .2s;outline:none;width:100%}
+.form-control{height:2.4rem;padding:0 0.75rem;border:1.5px solid var(--border);border-radius:0.6rem;font-family:inherit;font-size:0.85rem;color:var(--text);background:#fff;transition:border-color .2s,box-shadow .2s;outline:none;width:100%;box-sizing:border-box}
 .form-control:focus{border-color:#2e7d32;box-shadow:0 0 0 3px rgba(0,169,157,.12)}
 select.form-control{cursor:pointer}
 
@@ -144,23 +167,6 @@ select.form-control{cursor:pointer}
 .photo-box .pb-hint{font-size:0.75rem;color:#94a3b8}
 .photo-preview{width:100%;height:5rem;object-fit:cover;border-radius:0.5rem;display:none}
 .photo-clear{display:none;background:var(--danger);color:#fff;border:none;border-radius:0.5rem;padding:0.4rem 0.7rem;font-size:var(--fs-xs);font-weight:700;cursor:pointer;margin-top:0.3rem;width:100%}
-
-/* File Upload */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* 예약관리 */
 .btn-resv-add{width:100%;height:var(--input-h);background:linear-gradient(135deg,#1565c0,#42a5f5);color:#fff;border:none;border-radius:0.75rem;font-family:inherit;font-size:var(--fs-md);font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.6rem}
@@ -204,7 +210,7 @@ select.form-control{cursor:pointer}
 .btn-resv-del{margin-top:0.4rem;width:100%;height:2rem;background:#fce4ec;color:#c62828;border:none;border-radius:0.6rem;font-family:inherit;font-size:0.8rem;font-weight:700;cursor:pointer}
 .no-resv{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:var(--fs-sm);line-height:1.8}
 /* Submit */
-.btn-submit{width:100%;height:var(--btn-h);background:linear-gradient(135deg,#2e7d32,#66bb6a) !important;color:#fff !important;border:none;border-radius:1rem;font-family:inherit;font-size:var(--fs-lg);font-weight:800;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:0.7rem;box-shadow:0 6px 20px rgba(46,125,50,.30)}
+.btn-submit{width:100%;height:2.8rem;background:linear-gradient(135deg,#2e7d32,#66bb6a) !important;color:#fff !important;border:none;border-radius:0.75rem;font-family:inherit;font-size:0.9rem;font-weight:800;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:0.5rem;box-shadow:0 4px 14px rgba(46,125,50,.25)}
 .btn-submit:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,169,157,.40)}
 .btn-submit:active{transform:translateY(0)}
 .btn-submit:disabled{opacity:.6;cursor:not-allowed;transform:none}
@@ -425,20 +431,69 @@ tr:hover td{background:#f0faf9}
 @media(min-width:769px){
   .campus-grid{grid-template-columns:repeat(4,1fr)}
   .filter-row-2{grid-template-columns:1fr 1fr 1fr}
-  .card{padding:1.8rem 1.6rem}
-  .container{padding:1.5rem 1.5rem 5rem}
-  .logo-gyeonggi{height:4.5rem}
-  .logo-campus{height:3.2rem}
-  .s-card .s-num{font-size:2.2rem}
-  .s-card .s-label{font-size:0.9rem}
+  .card{padding:1.4rem 1.4rem}
+  .container{padding:1.2rem 1.4rem 5rem}
+  .tab-btn{padding:0.7rem 0.3rem;flex-direction:column;gap:0.15rem}
+  .tab-btn i{font-size:1.1rem}
+  .tab-label{font-size:0.65rem}
+  .logo-gyeonggi{height:3.5rem}
+  .logo-campus{height:2.5rem}
+  .s-card .s-num{font-size:1.8rem}
+  .s-card .s-label{font-size:0.85rem}
 }
 
-/* 소형폰 */
-@media(max-width:600px){
+/* 모바일 기본 (480px 이하) */
+@media(max-width:480px){
   .time-row-2{grid-template-columns:1fr}
   .photo-upload-wrap{grid-template-columns:1fr}
   .form-row-2{grid-template-columns:1fr}
-  .hero-title-txt{font-size:1.6rem}
+  .container{padding:0.5rem 0.6rem 4rem!important}
+  .card{padding:0.75rem 0.8rem!important;border-radius:0.7rem!important}
+  .tabs{padding:0.15rem;gap:0.1rem}
+  .tab-btn{padding:0.45rem 0}
+  .tab-label{font-size:0.5rem}
+  .tab-btn i{font-size:0.9rem}
+  .hero-title-txt{font-size:1.2rem}
+  .card{padding:0.85rem 0.9rem;margin-bottom:0.7rem}
+  .card-title{font-size:0.9rem;margin-bottom:0.8rem}
+  .form-control{height:2.4rem;font-size:0.85rem;padding:0 0.75rem}
+  .btn-submit{height:2.7rem;font-size:0.9rem}
+  .btn-filter{padding:0.5rem 0.9rem;font-size:0.78rem}
+  .tab-btn{padding:0.5rem 0}
+  .tab-label{font-size:0.55rem}
+  .tab-btn i{font-size:1rem}
+  .form-label{font-size:0.78rem;margin-bottom:0.3rem}
+  .form-stack{gap:0.6rem}
+  .container{padding:0.7rem 0.7rem 4.5rem}
+  .hero{padding:1rem 0.8rem}
+  .hero-title-txt{font-size:1.1rem!important}
+  .summary-wrap{padding:0 0.7rem}
+  .s-card{padding:0.8rem 0.7rem}
+  .s-card .s-num{font-size:1.3rem}
+  .s-card .s-label{font-size:0.65rem}
+  .resv-flt-btn{padding:0.28rem 0.6rem;font-size:0.72rem}
+  .stat-chk{font-size:0.75rem;padding:0.25rem 0.55rem}
+  .info-row-2{gap:0.5rem}
+  .banner{padding:0.6rem 0.8rem;font-size:0.8rem}
+  .logo-gyeonggi{height:2rem}
+  .logo-campus{height:1.6rem}
+  .nav{padding:0.6rem 0.8rem 0.4rem}
+  .modal-box{padding:1.2rem 1rem}
+  textarea.form-control{font-size:0.85rem}
+  .rpt-kpi-grid{grid-template-columns:repeat(2,1fr);gap:0.5rem}
+  .rpt-kpi{padding:0.7rem}
+  .rpt-kpi-num{font-size:1.4rem}
+  .form-row-3{grid-template-columns:1fr}
+  .cg-row{grid-template-columns:1fr!important}
+  .photo-box{height:110px}
+  select.form-control{font-size:0.82rem}
+}
+
+/* 탭 레이블 모바일 */
+@media(max-width:480px){
+  .tab-label{font-size:0.62rem;word-break:keep-all}
+  .tab-btn{padding:0.48rem 0}
+  .tab-btn i{font-size:0.95rem}
 }
 </style>
 </head>
@@ -522,19 +577,19 @@ tr:hover td{background:#f0faf9}
   <!-- 탭: 활동기록 / 예약관리 / 상담보고서 / 활동보고서 / 내기록 -->
   <div class="tabs" id="tabBar">
     <button class="tab-btn active" onclick="switchTab('form')" id="tabForm">
-      <i class="fa-solid fa-pen-to-square"></i> 활동 기록
+      <i class="fa-solid fa-pen-to-square"></i><span class="tab-label">활동 기록</span>
     </button>
     <button class="tab-btn" onclick="switchTab('resv')" id="tabResv">
-      <i class="fa-solid fa-calendar-days"></i> 예약 관리
+      <i class="fa-solid fa-calendar-days"></i><span class="tab-label">예약 관리</span>
     </button>
     <button class="tab-btn" onclick="switchTab('report')" id="tabReport">
-      <i class="fa-solid fa-file-medical"></i> 상담 보고서
+      <i class="fa-solid fa-file-medical"></i><span class="tab-label">상담 보고서</span>
     </button>
     <button class="tab-btn" onclick="switchTab('actreport')" id="tabActreport">
-      <i class="fa-solid fa-file-lines"></i> 활동 보고서
+      <i class="fa-solid fa-file-lines"></i><span class="tab-label">활동 보고서</span>
     </button>
     <button class="tab-btn" onclick="switchTab('my')" id="tabMy">
-      <i class="fa-solid fa-user-check"></i> 내 기록
+      <i class="fa-solid fa-user-check"></i><span class="tab-label">내 기록</span>
     </button>
     <!-- 관리자 탭은 JS로 동적 추가 -->
   </div>
@@ -805,7 +860,7 @@ tr:hover td{background:#f0faf9}
       </div>
 
       <div class="card">
-        <div class="card-title"><i class="fa-solid fa-file-lines"></i> 활동 보고서 작성</div>
+        <div class="card-title"><i class="fa-solid fa-file-lines"></i><span class="tab-label">활동 보고서</span> 작성</div>
         <div class="form-stack">
           <!-- 기본 정보 -->
           <div class="form-row-2">
@@ -1297,10 +1352,10 @@ tr:hover td{background:#f0faf9}
         <i class="fa-solid fa-chart-bar"></i> 전체 통계
       </button>
       <button class="my-subtab" id="adminSubRpt" data-admintab="rpt">
-        <i class="fa-solid fa-file-medical"></i> 상담 보고서
+        <i class="fa-solid fa-file-medical"></i><span class="tab-label">상담 보고서</span>
       </button>
       <button class="my-subtab" id="adminSubAct" data-admintab="act">
-        <i class="fa-solid fa-file-lines"></i> 활동 보고서
+        <i class="fa-solid fa-file-lines"></i><span class="tab-label">활동 보고서</span>
       </button>
     </div>
 
@@ -1479,7 +1534,7 @@ tr:hover td{background:#f0faf9}
     <!-- ③ 활동 보고서 통계 -->
     <div id="adminSubActContent" style="display:none">
       <div class="card">
-        <div class="card-title"><i class="fa-solid fa-file-lines"></i> 활동 보고서 통계</div>
+        <div class="card-title"><i class="fa-solid fa-file-lines"></i><span class="tab-label">활동 보고서</span> 통계</div>
         <div class="filter-stack" style="margin-bottom:1rem">
           <div class="form-row-2">
             <div class="form-group">
@@ -3648,7 +3703,7 @@ function doConsultantLogin(){
         closeModal('consultantLoginModal');
         applyLogin();
         showToast('✅ '+res.name+' 님으로 로그인되었습니다.','success');
-        switchTab('my');
+        switchTab('form');
       } else {
         errEl.textContent=res.msg;errEl.style.display='block';
       }
@@ -3703,7 +3758,7 @@ function applyLogin(){
     tabBar.innerHTML='';
     const btn=document.createElement('button');
     btn.className='tab-btn active';btn.id='tabAdmin';
-    btn.innerHTML='<i class="fa-solid fa-chart-bar"></i> 누적 현황 (관리자)';
+    btn.innerHTML='<i class="fa-solid fa-chart-bar"></i><span class="tab-label">누적 현황</span> (관리자)';
     btn.onclick=()=>switchTab('admin');
     tabBar.appendChild(btn);
     const logoutBtn=document.createElement('button');
@@ -3741,19 +3796,19 @@ function logout(){
   const tabBar=document.getElementById('tabBar');
   tabBar.innerHTML=`
     <button class="tab-btn active" onclick="switchTab('form')" id="tabForm">
-      <i class="fa-solid fa-pen-to-square"></i> 활동 기록
+      <i class="fa-solid fa-pen-to-square"></i><span class="tab-label">활동 기록</span>
     </button>
     <button class="tab-btn" onclick="switchTab('resv')" id="tabResv">
-      <i class="fa-solid fa-calendar-days"></i> 예약 관리
+      <i class="fa-solid fa-calendar-days"></i><span class="tab-label">예약 관리</span>
     </button>
     <button class="tab-btn" onclick="switchTab('report')" id="tabReport">
-      <i class="fa-solid fa-file-medical"></i> 상담 보고서
+      <i class="fa-solid fa-file-medical"></i><span class="tab-label">상담 보고서</span>
     </button>
     <button class="tab-btn" onclick="switchTab('actreport')" id="tabActreport">
-      <i class="fa-solid fa-file-lines"></i> 활동 보고서
+      <i class="fa-solid fa-file-lines"></i><span class="tab-label">활동 보고서</span>
     </button>
     <button class="tab-btn" onclick="switchTab('my')" id="tabMy">
-      <i class="fa-solid fa-user-check"></i> 내 기록
+      <i class="fa-solid fa-user-check"></i><span class="tab-label">내 기록</span>
     </button>`;
   // 내 기록 초기화
   document.getElementById('myLoginPrompt').style.display='';
