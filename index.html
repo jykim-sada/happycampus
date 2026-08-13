@@ -2174,6 +2174,7 @@ function loadActReports(period='all'){
             <span style="margin-left:auto;display:flex;gap:5px;flex-shrink:0">
               <button data-actprint-idx="${r.rowIndex}" style="font-size:11px;padding:3px 10px;border:1.5px solid #90caf9;border-radius:20px;background:#e3f2fd;color:#1565c0;cursor:pointer"><i class="fa-solid fa-print"></i> PDF</button>
               ${canEdit?`<button data-actedit-idx="${r.rowIndex}" style="font-size:11px;padding:3px 10px;border:1.5px solid #ffd54f;border-radius:20px;background:#fffde7;color:#f57f17;cursor:pointer"><i class="fa-solid fa-pen"></i> 수정</button>`:''}
+              ${canEdit?`<button data-actdel-idx="${r.rowIndex}" style="font-size:11px;padding:3px 10px;border:1.5px solid #fca5a5;border-radius:20px;background:#fee2e2;color:#c62828;cursor:pointer"><i class="fa-solid fa-trash"></i> 삭제</button>`:''}
             </span>
           </div>
         </div>`;
@@ -2189,6 +2190,19 @@ function loadActReports(period='all'){
         btn.addEventListener('click',function(){
           const r=res.reports.find(x=>x.rowIndex===parseInt(this.dataset.acteditIdx));
           if(r) openActReportEdit(r);
+        });
+      });
+      el.querySelectorAll('[data-actdel-idx]').forEach(btn=>{
+        btn.addEventListener('click',function(){
+          if(!confirm('이 활동 보고서를 삭제하시겠습니까?'))return;
+          const idx=parseInt(this.dataset.actdelIdx);
+          google.script.run
+            .withSuccessHandler(res=>{
+              if(res&&res.success){ showToast('삭제되었습니다','success'); loadActReports('all'); }
+              else showToast('삭제 실패: '+((res&&res.error)||''),'error');
+            })
+            .withFailureHandler(err=>showToast('삭제 실패: '+err.message,'error'))
+            .deleteActReport(idx, currentUser);
         });
       });
       }catch(clientErr){
