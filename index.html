@@ -2507,6 +2507,7 @@ function loadMyRptList(period='all'){
             <span style="margin-left:auto;display:flex;gap:5px;flex-shrink:0">
               <button data-rptprint="${r.rowIndex}" style="font-size:11px;padding:3px 10px;border:1.5px solid #90caf9;border-radius:20px;background:#e3f2fd;color:#1565c0;cursor:pointer"><i class="fa-solid fa-print"></i> PDF</button>
               ${canEdit?`<button data-rptedit="${r.rowIndex}" style="font-size:11px;padding:3px 10px;border:1.5px solid #ffd54f;border-radius:20px;background:#fffde7;color:#f57f17;cursor:pointer"><i class="fa-solid fa-pen"></i> 수정</button>`:''}
+              ${canEdit?`<button data-rptdel="${r.rowIndex}" style="font-size:11px;padding:3px 10px;border:1.5px solid #fca5a5;border-radius:20px;background:#fee2e2;color:#c62828;cursor:pointer"><i class="fa-solid fa-trash"></i> 삭제</button>`:''}
             </span>
           </div>
         </div>`;
@@ -2523,6 +2524,19 @@ function loadMyRptList(period='all'){
           const idx=parseInt(this.dataset.rptedit);
           const r=res.reports.find(x=>x.rowIndex===idx);
           if(r) openRptReportEdit(r);
+        });
+      });
+      el.querySelectorAll('[data-rptdel]').forEach(btn=>{
+        btn.addEventListener('click',function(){
+          if(!confirm('이 상담 보고서를 삭제하시겠습니까?'))return;
+          const idx=parseInt(this.dataset.rptdel);
+          google.script.run
+            .withSuccessHandler(res=>{
+              if(res&&res.success){ showToast('삭제되었습니다','success'); loadMyRptList('all'); }
+              else showToast('삭제 실패: '+((res&&res.error)||''),'error');
+            })
+            .withFailureHandler(err=>showToast('삭제 실패: '+err.message,'error'))
+            .deleteReport(idx, currentUser);
         });
       });
       }catch(clientErr){
