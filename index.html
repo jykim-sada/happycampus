@@ -280,7 +280,7 @@ tr:hover td{background:#f0faf9}
 
 /* Calendar */
 .cal-wrap{position:relative;display:inline-block;width:100%}
-.cal-popup{display:none;position:absolute;top:calc(100% + 0.5rem);left:0;background:#fff;border:1.5px solid var(--border);border-radius:1rem;box-shadow:var(--shadow-lg);z-index:1000;padding:1.1rem;width:100%;min-width:16rem}
+.cal-popup{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:1.5px solid var(--border);border-radius:1rem;box-shadow:var(--shadow-lg);z-index:3000;padding:1.1rem;width:90%;max-width:20rem;max-height:85vh;overflow:auto}
 .cal-popup.open{display:block}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.9rem}
 .cal-nav button{background:radial-gradient(ellipse at 30% 20%,rgba(255,255,255,.25) 0%,transparent 55%);border:none;font-size:1.5rem;cursor:pointer;color:#2e7d32;padding:0.3rem 0.6rem;border-radius:0.5rem}
