@@ -712,20 +712,26 @@ tr:hover td{background:#f0faf9}
       <div class="time-block">
         <div class="time-block-header"><div class="time-block-title">💬 컨설팅</div><span class="badge badge-green">컨설팅 시간</span></div>
         <div class="time-cols">
-          <div class="time-row-2">
-            <div class="form-group"><label class="form-label">시작 시각</label><input type="time" id="consultStart" class="form-control" onchange="calcTime('consult')"></div>
-            <div class="form-group"><label class="form-label">종료 시각</label><input type="time" id="consultEnd" class="form-control" onchange="calcTime('consult')"></div>
+          <div id="consultBlocks">
+            <div class="time-row-2">
+              <div class="form-group"><label class="form-label">시작 시각</label><input type="time" id="consultStart" class="form-control consult-start" onchange="calcTime('consult')"></div>
+              <div class="form-group"><label class="form-label">종료 시각</label><input type="time" id="consultEnd" class="form-control consult-end" onchange="calcTime('consult')"></div>
+            </div>
           </div>
+          <button type="button" onclick="addTimePair('consult')" style="width:100%;height:2.3rem;background:#f0faf9;color:#2e7d32;border:1.5px dashed #a5d6a7;border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin:0.2rem 0 0.7rem"><i class="fa-solid fa-plus"></i> 컨설팅 시간 추가</button>
           <div class="form-group"><label class="form-label">총 컨설팅 시간</label><div class="total-display" id="totalConsult">컨설팅 시간 입력 후 자동 계산</div></div>
         </div>
       </div>
       <div class="time-block">
         <div class="time-block-header"><div class="time-block-title">📌 컨설팅 외</div><span class="badge badge-orange">기타 활동</span></div>
         <div class="time-cols">
-          <div class="time-row-2">
-            <div class="form-group"><label class="form-label">시작 시각</label><input type="time" id="otherStart" class="form-control" onchange="calcTime('other')"></div>
-            <div class="form-group"><label class="form-label">종료 시각</label><input type="time" id="otherEnd" class="form-control" onchange="calcTime('other')"></div>
+          <div id="otherBlocks">
+            <div class="time-row-2">
+              <div class="form-group"><label class="form-label">시작 시각</label><input type="time" id="otherStart" class="form-control other-start" onchange="calcTime('other')"></div>
+              <div class="form-group"><label class="form-label">종료 시각</label><input type="time" id="otherEnd" class="form-control other-end" onchange="calcTime('other')"></div>
+            </div>
           </div>
+          <button type="button" onclick="addTimePair('other')" style="width:100%;height:2.3rem;background:#fff8f0;color:#e65100;border:1.5px dashed #ffcc80;border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin:0.2rem 0 0.7rem"><i class="fa-solid fa-plus"></i> 컨설팅 외 시간 추가</button>
           <div class="form-group"><label class="form-label">총 활동 시간</label><div class="total-display" id="totalOther">활동 시간 입력 후 자동 계산</div></div>
         </div>
       </div>
@@ -1977,24 +1983,39 @@ function saveResvFromPanel(){
 function loadResvListSimple(){
   const el=document.getElementById('resvSubList');
   el.innerHTML='<div class="no-resv"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</div>';
+  // 예약 + 상담보고서를 함께 불러와 "작성/확인" 및 완료여부 판단
   google.script.run
-    .withSuccessHandler(rawRes=>{
-      const res = typeof rawRes==='string' ? JSON.parse(rawRes) : rawRes;
-      if(!res||!res.success){el.innerHTML='<div class="no-resv">불러오기 실패</div>';return;}
-      renderResvListSimple(res.reservations,el);
+    .withSuccessHandler(rawResv=>{
+      const rres = typeof rawResv==='string' ? JSON.parse(rawResv) : rawResv;
+      if(!rres||!rres.success){el.innerHTML='<div class="no-resv">불러오기 실패</div>';return;}
+      google.script.run
+        .withSuccessHandler(rawRpt=>{
+          const pres = typeof rawRpt==='string' ? JSON.parse(rawRpt) : rawRpt;
+          const reports=(pres&&pres.success&&pres.reports)?pres.reports:[];
+          renderResvListSimple(rres.reservations, reports, el);
+        })
+        .withFailureHandler(()=>renderResvListSimple(rres.reservations, [], el))
+        .getMyReports(currentUser);
     })
+    .withFailureHandler(err=>{el.innerHTML='<div class="no-resv">불러오기 실패: '+err.message+'</div>';})
     .getAllMyReservations(currentUser);
 }
 
-function renderResvListSimple(list,el){
+function renderResvListSimple(list, reports, el){
   if(!list||!list.length){
     el.innerHTML='<div class="no-resv">예약 내역이 없습니다</div>';return;
   }
-  const statusColor={예약중:'#1565c0',완료:'#2e7d32',취소:'#c62828',노쇼:'#f57c00'};
-  const ctOpt=(v)=>['오프라인','온라인','유선'].map(o=>`<option value="${o}" ${v===o?'selected':''}>${o}</option>`).join('');
+  // 상담보고서 매칭: "날짜|이름" → 보고서 rowIndex (있으면 = 완료)
+  const rptMap={};
+  (reports||[]).forEach(rp=>{
+    const k=fmtDateStr(rp.resvDate)+'|'+String(rp.clientName||'').trim();
+    if(!(k in rptMap)) rptMap[k]=rp.rowIndex;
+  });
   const html=list.map(r=>{
     const t=_fmtTimeKr(r.resvTime);
-    const memoV=(r.memo||'').replace(/"/g,'&quot;');
+    const key=fmtDateStr(r.resvDate)+'|'+String(r.clientName||'').trim();
+    const rptRow=rptMap[key];
+    const done=(rptRow!==undefined);   // 상담보고서 작성됨 → 완료
     return `
     <div class="card" id="resvS_${r.rowIndex}" style="margin-bottom:0.7rem;padding:14px 16px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -2002,23 +2023,15 @@ function renderResvListSimple(list,el){
         <span style="font-size:18px;font-weight:800;color:#1565c0">${t}</span>
         <span style="font-size:15px;font-weight:700">${r.clientName}</span>
         <span style="font-size:12px;color:#666">${r.session}</span>
-        <span style="color:${statusColor[r.status]||'#666'};font-size:13px;font-weight:700;margin-left:auto">${r.status}</span>
+        ${r.consultType?`<span style="font-size:12px;color:#555">${r.consultType}</span>`:''}
+        ${r.campus?`<span style="font-size:12px;color:#555">📍 ${r.campus}</span>`:''}
+        <span style="margin-left:auto;font-size:13px;font-weight:800;color:${done?'#2e7d32':'#1565c0'}">${done?'완료':'예약중'}</span>
       </div>
-      <div style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        ${['완료','취소','노쇼','예약중'].map(s=>`<button onclick="setResvStatus2(${r.rowIndex},'${s}')" style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1.5px solid ${statusColor[s]};background:${r.status===s?statusColor[s]:'#fff'};color:${r.status===s?'#fff':statusColor[s]}">${s}</button>`).join('')}
-        ${r.campus?`<span style="font-size:12px;color:#555;margin-left:auto">📍 ${r.campus}</span>`:''}
-      </div>
-      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <select id="rs2ct_${r.rowIndex}" style="height:2.2rem;padding:0 8px;border:1.5px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:13px;background:#fff"><option value="">상담방식</option>${ctOpt(r.consultType)}</select>
-        <input id="rs2memo_${r.rowIndex}" placeholder="비고 메모" value="${memoV}" style="flex:1;min-width:120px;height:2.2rem;padding:0 8px;border:1.5px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:13px">
-        <button onclick="saveResvDetail2(${r.rowIndex})" style="height:2.2rem;padding:0 12px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:12px;font-weight:700;cursor:pointer">💾 저장</button>
-      </div>
-      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn-resv-load" style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7"
-          onclick="goToReportFromResv('${r.resvDate}','${r.clientName}','${t}','${r.session}','${r.consultType||''}')">
-          <i class="fa-solid fa-file-medical"></i> 보고서 작성
-        </button>
-        <button style="background:#fee2e2;color:#c62828;border:1.5px solid #fca5a5;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer" onclick="deleteResv2(${r.rowIndex})">
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+        ${done
+          ?`<button style="background:#e3f2fd;color:#1565c0;border:1.5px solid #90caf9;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer" onclick="openRptById(${rptRow})"><i class="fa-solid fa-file-lines"></i> 상담 보고서 확인</button>`
+          :`<button style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer" onclick="goToReportFromResv('${r.resvDate}','${r.clientName}','${t}','${r.session}','${r.consultType||''}','${(r.campus||'').replace(/'/g,'')}')"><i class="fa-solid fa-file-medical"></i> 상담 보고서 작성</button>`}
+        <button style="background:#fee2e2;color:#c62828;border:1.5px solid #fca5a5;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer" onclick="deleteResv2(${r.rowIndex})">
           <i class="fa-solid fa-trash"></i> 예약 삭제
         </button>
       </div>
@@ -2027,29 +2040,7 @@ function renderResvListSimple(list,el){
   el.innerHTML=html;
 }
 
-// ── 예약관리 탭 예약현황: 상태변경 / 저장 / 삭제 ──
-function setResvStatus2(rowIndex,status){
-  google.script.run
-    .withSuccessHandler(res=>{
-      if(res&&res.success){ showToast('상태가 변경되었습니다','success'); loadResvListSimple(); }
-      else showToast('변경 실패: '+((res&&res.error)||''),'error');
-    })
-    .withFailureHandler(err=>showToast('변경 실패: '+err.message,'error'))
-    .updateReservation(rowIndex, currentUser, {status});
-}
-function saveResvDetail2(rowIndex){
-  const data={
-    consultType: document.getElementById('rs2ct_'+rowIndex)?.value||'',
-    memo:        document.getElementById('rs2memo_'+rowIndex)?.value||''
-  };
-  google.script.run
-    .withSuccessHandler(res=>{
-      if(res&&res.success) showToast('저장되었습니다','success');
-      else showToast('저장 실패: '+((res&&res.error)||''),'error');
-    })
-    .withFailureHandler(err=>showToast('저장 실패: '+err.message,'error'))
-    .updateReservation(rowIndex, currentUser, data);
-}
+// ── 예약관리 탭 예약현황: 삭제 ──
 function deleteResv2(rowIndex){
   if(!confirm('이 예약을 삭제하시겠습니까?'))return;
   google.script.run
@@ -2061,21 +2052,41 @@ function deleteResv2(rowIndex){
     .deleteReservation(rowIndex, currentUser);
 }
 
-function goToReportFromResv(date,client,time,session,consultType){
+// 상담보고서 저장 후 → 해당 예약을 '완료'로 자동 변경 (탭 간 상태 일치)
+function markReservationDone(date, client){
+  if(!date||!client||!currentUser)return;
+  google.script.run
+    .withSuccessHandler(rawRes=>{
+      const res=typeof rawRes==='string'?JSON.parse(rawRes):rawRes;
+      if(!res||!res.success||!res.reservations)return;
+      const rv=res.reservations.find(x=>String(x.clientName||'').trim()===String(client).trim() && x.status!=='완료');
+      if(rv) google.script.run.updateReservation(rv.rowIndex, currentUser, {status:'완료'});
+    })
+    .getMyReservations(currentUser, date);
+}
+
+function goToReportFromResv(date,client,time,session,consultType,campus){
   switchTab('report');
   setTimeout(()=>{
     document.getElementById('rptDate').value = date;
     document.getElementById('rptClientManual').value = client;
+    if(campus){ const ce=document.getElementById('rptCampus'); if(ce) ce.value = campus; }
     document.getElementById('rptResvTime').value = time || '';
     document.getElementById('rptSession').value = session || '1회';
     document.getElementById('rptConsultType').value = consultType || '';
     document.getElementById('rptStart').value = time || '';
     calcRptDur();
     showToast('예약 정보를 불러왔습니다','success');
-  },300);
+  },400);
 }
 
 // ── 활동 보고서 탭 ──────────────────────────────────────────────
+// 오늘 날짜(한국 로컬 yyyy-MM-dd) — toISOString은 UTC라 아침엔 어제로 나오므로 이걸 사용
+function todayStr(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
 function refreshActreportPanel(){
   if(!currentRole||currentRole==='admin'){
     document.getElementById('actreportLoginPrompt').style.display='';
@@ -2085,9 +2096,9 @@ function refreshActreportPanel(){
   document.getElementById('actreportLoginPrompt').style.display='none';
   document.getElementById('actreportContent').style.display='';
   document.getElementById('actreportBannerName').textContent=currentUser;
-  // 오늘 날짜 기본값
+  // 오늘 날짜 기본값 (한국 로컬 날짜)
   const dateEl=document.getElementById('arDate');
-  if(dateEl&&!dateEl.value) dateEl.value=new Date().toISOString().split('T')[0];
+  if(dateEl&&!dateEl.value) dateEl.value=todayStr();
   // 시간 입력 이벤트
   document.querySelectorAll('[data-arcalc]').forEach(el=>{
     if(!el.dataset.bound){ el.dataset.bound='1';
@@ -3100,8 +3111,8 @@ function refreshReportPanel(){
       if(wrap&&wrap.style.display!=='none') loadRptResvList();
     });
   }
-  // 오늘 날짜 기본 설정
-  const today=new Date().toISOString().split('T')[0];
+  // 오늘 날짜 기본 설정 (한국 로컬 날짜 - UTC 변환으로 어제 나오는 문제 방지)
+  const today=todayStr();
   if(!document.getElementById('rptDate').value){
     document.getElementById('rptDate').value=today;
   }
@@ -3232,6 +3243,7 @@ function submitReport(){
       btn.style.background='';
       delete btn.dataset.editRow;
       showToast(successMsg,'success');
+      markReservationDone(date, clientName);   // 예약을 완료로 자동 변경
       resetRptForm();
       loadMyRptList();
     } else {
@@ -4079,81 +4091,173 @@ function refreshMyPanel(){
 
 function renderMyTable(records){
   const body=document.getElementById('myBody');
-  const today=new Date().toISOString().split('T')[0];
   if(!records||!records.length){
     body.innerHTML='<tr><td colspan="8" class="no-data"><i class="fa-solid fa-inbox"></i>기록이 없습니다.</td></tr>';return;
   }
-  body.innerHTML=records.map(r=>{
-    const canEdit=isWithin7Days(r.submitTime);
+  // ── 활동일자별 병합 (같은 날 = 한 줄) ──
+  const byDate={};
+  records.forEach(r=>{
+    const d=r.activityDate||'';
+    if(!byDate[d]) byDate[d]={activityDate:d, campus:r.campus||'', clockIn:'', clockOut:'', fileUrl:'', submitTime:r.submitTime, mainRecord:r, rowIndexes:[], consults:[], others:[], relatedRpt:[], relatedAct:[]};
+    const g=byDate[d];
+    g.rowIndexes.push(r.rowIndex);
+    if(r.clockIn && !g.clockIn){ g.clockIn=r.clockIn; g.clockOut=r.clockOut; g.mainRecord=r; g.submitTime=r.submitTime; if(r.campus) g.campus=r.campus; }
+    if(!g.campus && r.campus) g.campus=r.campus;
+    if(r.fileUrl && !g.fileUrl) g.fileUrl=r.fileUrl;
+    if(r.consultStart) g.consults.push({start:r.consultStart, end:r.consultEnd, rowIndex:r.rowIndex});
+    if(r.otherStart) g.others.push({start:r.otherStart, end:r.otherEnd, rowIndex:r.rowIndex});
+    (r.relatedRpt||[]).forEach(rp=>{ if(!g.relatedRpt.some(x=>x.rowIndex===rp.rowIndex)) g.relatedRpt.push(rp); });
+    (r.relatedAct||[]).forEach(ac=>{ if(!g.relatedAct.some(x=>x.rowIndex===ac.rowIndex)) g.relatedAct.push(ac); });
+  });
+  const dates=Object.keys(byDate).sort((a,b)=>String(b).localeCompare(String(a)));
+
+  body.innerHTML=dates.map(d=>{
+    const g=byDate[d];
+    const canEdit=isWithin7Days(g.submitTime);
     const actions=canEdit
-      ?'<button class="btn-edit" onclick=\'openEdit('+JSON.stringify(r)+')\'>수정</button><button class="btn-del" onclick="doDelete('+r.rowIndex+')">삭제</button>'
+      ?'<button class="btn-edit" onclick=\'openEdit('+JSON.stringify(g.mainRecord)+')\'>수정</button><button class="btn-del" onclick=\'deleteDay('+JSON.stringify(g.rowIndexes)+')\'>삭제</button>'
       :'<span style="color:#94a3b8;font-size:12px">7일 지남</span>';
 
-    // 컨설팅 시간 있으면 → 상담보고서 배지
-    const rptBadges=(r.relatedRpt||[]).map(rpt=>
-      `<span class="my-rpt-badge" data-date="${r.activityDate}" data-client="${rpt.client}"
-        style="display:inline-flex;align-items:center;gap:4px;background:#e3f2fd;color:#1565c0;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;cursor:pointer;margin:2px">
-        📄 상담: ${rpt.client} ${rpt.time}
+    // 상담보고서 라인 (확인=수정, ✕=삭제)
+    const rptBadges=(g.relatedRpt||[]).map(rpt=>
+      `<span style="display:inline-flex;align-items:center;gap:6px;background:#e3f2fd;color:#1565c0;font-size:11px;font-weight:700;padding:3px 5px 3px 10px;border-radius:20px;margin:2px">
+        <span class="my-rpt-open" data-rpt-row="${rpt.rowIndex}" style="cursor:pointer">📄 ${rpt.client}님 상담보고서 확인</span>
+        <span class="my-rpt-del" data-rpt-row="${rpt.rowIndex}" title="삭제" style="cursor:pointer;background:#fee2e2;color:#c62828;width:17px;height:17px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px">✕</span>
       </span>`).join('');
+    const rptWriteBadge=(g.consults.length&&!(g.relatedRpt&&g.relatedRpt.length))
+      ?`<span data-goto-report="${g.activityDate}" style="display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#f57c00;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;cursor:pointer;margin:2px">✏️ 상담보고서 작성</span>`:rptBadges;
 
-    // 컨설팅 시간은 있는데 연결된 상담보고서가 없으면 → 작성 유도 배지
-    const hasConsult=r.consultStart&&r.consultStart!=='';
-    const hasOther=r.otherStart&&r.otherStart!=='';
-    const rptWriteBadge=(hasConsult&&!(r.relatedRpt&&r.relatedRpt.length))
-      ?`<span data-goto-report="${r.activityDate}"
-          style="display:inline-flex;align-items:center;gap:4px;background:#fff3e0;color:#f57c00;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;cursor:pointer;margin:2px">
-          ✏️ 상담보고서 작성
-        </span>`:rptBadges;
-
-    // 컨설팅외 시간 있으면 → 활동보고서 배지
-    const actBadges=(r.relatedAct||[]).map(act=>
-      `<span class="my-act-badge" data-date="${r.activityDate}"
-        style="display:inline-flex;align-items:center;gap:4px;background:#f3e5f5;color:#6a1b9a;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;cursor:pointer;margin:2px">
-        📋 활동: ${act.type} ${act.startTime}~${act.endTime}
+    // 활동보고서 라인
+    const actBadges=(g.relatedAct||[]).map(act=>
+      `<span style="display:inline-flex;align-items:center;gap:6px;background:#f3e5f5;color:#6a1b9a;font-size:11px;font-weight:700;padding:3px 5px 3px 10px;border-radius:20px;margin:2px">
+        <span class="my-act-open" data-act-row="${act.rowIndex}" style="cursor:pointer">📋 ${act.type} 활동보고서 확인</span>
+        <span class="my-act-del" data-act-row="${act.rowIndex}" title="삭제" style="cursor:pointer;background:#fee2e2;color:#c62828;width:17px;height:17px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px">✕</span>
       </span>`).join('');
-    const actWriteBadge=(hasOther&&!(r.relatedAct&&r.relatedAct.length))
-      ?`<span data-goto-actreport="${r.activityDate}"
-          style="display:inline-flex;align-items:center;gap:4px;background:#fce4ec;color:#ad1457;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;cursor:pointer;margin:2px">
-          ✏️ 활동보고서 작성
-        </span>`:actBadges;
+    const actWriteBadge=(g.others.length&&!(g.relatedAct&&g.relatedAct.length))
+      ?`<span data-goto-actreport="${g.activityDate}" style="display:inline-flex;align-items:center;gap:4px;background:#fce4ec;color:#ad1457;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;cursor:pointer;margin:2px">✏️ 활동보고서 작성</span>`:actBadges;
 
-    const relatedHtml=((hasConsult||rptBadges)||(hasOther||actBadges))
-      ?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:2px">${rptWriteBadge}${actWriteBadge}</div>`:'';
+    const relatedHtml=(rptWriteBadge||actWriteBadge)
+      ?`<div style="margin-top:5px;display:flex;flex-direction:column;align-items:flex-start;gap:3px">${rptWriteBadge}${actWriteBadge}</div>`:'';
+
+    // 컨설팅/컨설팅외 시간들 (여러 개면 줄바꿈, 블록별 ✕ 삭제)
+    const cell=(arr)=> arr.length
+      ? arr.map(c=>`<span style="display:inline-flex;align-items:center;gap:3px;white-space:nowrap">${c.start||'—'}~${c.end||'—'}${canEdit?` <span onclick="deleteBlock(${c.rowIndex})" title="이 시간 삭제" style="cursor:pointer;color:#c62828;font-size:10px">✕</span>`:''}</span>`).join('<br>')
+      : '—';
 
     return `<tr>
-      <td><div>${r.activityDate}</div>${relatedHtml}</td>
-      <td style="max-width:100px;white-space:normal;font-size:12px">${r.campus}</td>
-      <td>${r.clockIn||'—'}</td>
-      <td>${r.clockOut||'—'}</td>
-      <td>${r.consultStart?r.consultStart+'~'+r.consultEnd:'—'}</td>
-      <td>${r.otherStart?r.otherStart+'~'+r.otherEnd:'—'}</td>
-      <td>${r.fileUrl?'<a class="link-btn" href="'+r.fileUrl+'" target="_blank"><i class="fa-solid fa-file-arrow-down"></i></a>':'—'}</td>
+      <td><div>${g.activityDate}</div>${relatedHtml}</td>
+      <td style="max-width:100px;white-space:normal;font-size:12px">${g.campus}</td>
+      <td>${g.clockIn||'—'}</td>
+      <td>${g.clockOut||'—'}</td>
+      <td>${cell(g.consults)}</td>
+      <td>${cell(g.others)}</td>
+      <td>${g.fileUrl?'<a class="link-btn" href="'+g.fileUrl+'" target="_blank"><i class="fa-solid fa-file-arrow-down"></i></a>':'—'}</td>
       <td>${actions}</td>
     </tr>`;
   }).join('');
 
-  // 상담보고서 배지 클릭 → 상담보고서 탭
-  body.querySelectorAll('.my-rpt-badge,[data-goto-report]').forEach(el=>{
+  // 상담보고서 "확인" → 해당 보고서 수정 화면 열기
+  body.querySelectorAll('.my-rpt-open').forEach(el=>{
+    el.addEventListener('click',function(){ openRptById(parseInt(this.dataset.rptRow)); });
+  });
+  // 상담보고서 ✕ → 삭제
+  body.querySelectorAll('.my-rpt-del').forEach(el=>{
+    el.addEventListener('click',function(){
+      if(!confirm('이 상담보고서를 삭제하시겠습니까?'))return;
+      const idx=parseInt(this.dataset.rptRow);
+      google.script.run
+        .withSuccessHandler(res=>{ if(res&&res.success){ showToast('삭제되었습니다','success'); refreshMyPanel(); } else showToast('삭제 실패: '+((res&&res.error)||''),'error'); })
+        .withFailureHandler(err=>showToast('삭제 실패: '+err.message,'error'))
+        .deleteReport(idx, currentUser);
+    });
+  });
+  // 활동보고서 "확인" → 해당 보고서 수정 화면 열기
+  body.querySelectorAll('.my-act-open').forEach(el=>{
+    el.addEventListener('click',function(){ openActById(parseInt(this.dataset.actRow)); });
+  });
+  // 활동보고서 ✕ → 삭제
+  body.querySelectorAll('.my-act-del').forEach(el=>{
+    el.addEventListener('click',function(){
+      if(!confirm('이 활동보고서를 삭제하시겠습니까?'))return;
+      const idx=parseInt(this.dataset.actRow);
+      google.script.run
+        .withSuccessHandler(res=>{ if(res&&res.success){ showToast('삭제되었습니다','success'); refreshMyPanel(); } else showToast('삭제 실패: '+((res&&res.error)||''),'error'); })
+        .withFailureHandler(err=>showToast('삭제 실패: '+err.message,'error'))
+        .deleteActReport(idx, currentUser);
+    });
+  });
+  // 작성 유도 배지 → 해당 탭으로 이동
+  body.querySelectorAll('[data-goto-report]').forEach(el=>{
     el.addEventListener('click',function(){
       switchTab('report');
-      const date=this.dataset.date||this.dataset.gotoReport;
-      if(date) setTimeout(()=>{
-        const dateEl=document.getElementById('rptDate');
-        if(dateEl){ dateEl.value=date; loadRptResvList(); }
-      },400);
+      const date=this.dataset.gotoReport;
+      if(date) setTimeout(()=>{ const dateEl=document.getElementById('rptDate'); if(dateEl){ dateEl.value=date; loadRptResvList(); } },400);
     });
   });
-  // 활동보고서 배지 클릭 → 활동보고서 탭
-  body.querySelectorAll('.my-act-badge,[data-goto-actreport]').forEach(el=>{
+  body.querySelectorAll('[data-goto-actreport]').forEach(el=>{
     el.addEventListener('click',function(){
       switchTab('actreport');
-      const date=this.dataset.date||this.dataset.gotoActreport;
-      if(date) setTimeout(()=>{
-        const dateEl=document.getElementById('arDate');
-        if(dateEl) dateEl.value=date;
-      },400);
+      const date=this.dataset.gotoActreport;
+      if(date) setTimeout(()=>{ const dateEl=document.getElementById('arDate'); if(dateEl) dateEl.value=date; },400);
     });
   });
+}
+
+// ── 특정 상담/활동 보고서를 열어 수정 화면으로 이동 ──
+function openRptById(rowIndex){
+  if(!rowIndex||!currentUser)return;
+  google.script.run
+    .withSuccessHandler(rawRes=>{
+      const res=typeof rawRes==='string'?JSON.parse(rawRes):rawRes;
+      if(!res||!res.success||!res.reports){ showToast('불러오기 실패','error'); return; }
+      const r=res.reports.find(x=>x.rowIndex===rowIndex);
+      if(r) openRptReportEdit(r); else showToast('보고서를 찾을 수 없습니다','error');
+    })
+    .withFailureHandler(err=>showToast('불러오기 실패: '+err.message,'error'))
+    .getMyReports(currentUser);
+}
+function openActById(rowIndex){
+  if(!rowIndex||!currentUser)return;
+  google.script.run
+    .withSuccessHandler(rawRes=>{
+      const res=typeof rawRes==='string'?JSON.parse(rawRes):rawRes;
+      if(!res||!res.success||!res.reports){ showToast('불러오기 실패','error'); return; }
+      const r=res.reports.find(x=>x.rowIndex===rowIndex);
+      if(r) openActReportEdit(r); else showToast('보고서를 찾을 수 없습니다','error');
+    })
+    .withFailureHandler(err=>showToast('불러오기 실패: '+err.message,'error'))
+    .getActReports(currentUser);
+}
+
+// 활동일자 한 줄 전체 삭제 (그 날짜의 모든 출력결과 행) — 행 밀림 방지 위해 큰 rowIndex부터
+function deleteDay(rowIndexes){
+  if(!rowIndexes||!rowIndexes.length)return;
+  if(!confirm('이 날짜의 활동 기록을 모두 삭제하시겠습니까?'))return;
+  const sorted=rowIndexes.slice().sort((a,b)=>b-a);
+  let fail=0;
+  const delOne=(i)=>{
+    if(i>=sorted.length){
+      if(fail===0) showToast('삭제되었습니다','success'); else showToast('일부 삭제 실패','error');
+      refreshMyPanel(); loadPublicStats(); return;
+    }
+    google.script.run
+      .withSuccessHandler(res=>{ if(!(res&&res.success)) fail++; delOne(i+1); })
+      .withFailureHandler(()=>{ fail++; delOne(i+1); })
+      .deleteRecord(sorted[i], currentUser);
+  };
+  delOne(0);
+}
+
+// 시간 블록 하나(출력결과 한 행) 삭제
+function deleteBlock(rowIndex){
+  if(!confirm('이 시간 기록을 삭제하시겠습니까?'))return;
+  google.script.run
+    .withSuccessHandler(res=>{
+      if(res&&res.success){ showToast('삭제되었습니다','success'); refreshMyPanel(); loadPublicStats(); }
+      else showToast('삭제 실패: '+((res&&res.error)||''),'error');
+    })
+    .withFailureHandler(err=>showToast('삭제 실패: '+err.message,'error'))
+    .deleteRecord(rowIndex, currentUser);
 }
 
 function initStatsYearSelect(){
@@ -4721,37 +4825,104 @@ async function uploadPhoto(file,key){
 }
 
 // ── 제출 ──────────────────────────────────────────
+// ── 컨설팅/컨설팅외 시간 블록 추가 ──
+function addTimePair(kind){
+  const box=document.getElementById(kind==='consult'?'consultBlocks':'otherBlocks');
+  if(!box) return;
+  const sCls=kind==='consult'?'consult-start':'other-start';
+  const eCls=kind==='consult'?'consult-end':'other-end';
+  const div=document.createElement('div');
+  div.className='time-row-2';
+  div.style.marginTop='0.5rem';
+  div.innerHTML=
+    '<div class="form-group"><label class="form-label">시작 시각 (추가)</label><input type="time" class="form-control '+sCls+'"></div>'+
+    '<div class="form-group"><label class="form-label">종료 시각 (추가)</label>'+
+      '<div style="display:flex;gap:4px">'+
+        '<input type="time" class="form-control '+eCls+'" style="flex:1">'+
+        '<button type="button" title="이 시간 삭제" style="width:2.6rem;flex-shrink:0;border:1.5px solid #fca5a5;background:#fee2e2;color:#c62828;border-radius:8px;cursor:pointer;font-weight:700" onclick="this.closest(\'.time-row-2\').remove()">✕</button>'+
+      '</div>'+
+    '</div>';
+  box.appendChild(div);
+}
+
+// 폼에서 컨설팅/컨설팅외 시간 블록 수집
+function collectTimeBlocks(kind){
+  const box=document.getElementById(kind==='consult'?'consultBlocks':'otherBlocks');
+  if(!box) return [];
+  const starts=box.querySelectorAll(kind==='consult'?'.consult-start':'.other-start');
+  const ends  =box.querySelectorAll(kind==='consult'?'.consult-end':'.other-end');
+  const blocks=[];
+  starts.forEach((el,i)=>{
+    const start=el.value; const end=ends[i]?ends[i].value:'';
+    if(start||end) blocks.push({start,end});
+  });
+  return blocks;
+}
+
 async function submitForm(){
   const date=document.getElementById('activityDate').value;
   const name=document.getElementById('consultantName').value;
   const camp=document.getElementById('campus').value;
   if(!date||!name||!camp){showToast('활동일자, 컨설턴트명, 활동지역은 필수입니다.','error');return;}
   const btn=document.getElementById('submitBtn');
+  if(btn.disabled) return;
   btn.disabled=true;btn.innerHTML='<div class="loader"></div> 저장 중...';
-  const data={activityDate:date,consultantName:name,campus:camp,
-    clockIn:document.getElementById('clockIn').value,clockOut:document.getElementById('clockOut').value,
-    consultStart:document.getElementById('consultStart').value,consultEnd:document.getElementById('consultEnd').value,
-    otherStart:document.getElementById('otherStart').value,otherEnd:document.getElementById('otherEnd').value,
-    clockInPhoto:'',clockOutPhoto:'',fileName:'',fileUrl:''};
-  if(photoFiles.clockIn)  data.clockInPhoto =await uploadPhoto(photoFiles.clockIn,'clockIn');
-  if(photoFiles.clockOut) data.clockOutPhoto=await uploadPhoto(photoFiles.clockOut,'clockOut');
-  // 파일 업로드 제거됨
-  google.script.run
-    .withSuccessHandler(res=>{
-      btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-paper-plane"></i> 저장';
-      if(res.success){showToast('✅ 활동 기록이 저장되었습니다!','success');resetForm();loadPublicStats();}
-      else showToast('저장 실패: '+(res.error||''),'error');
-    })
-    .withFailureHandler(err=>{btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-paper-plane"></i> 저장';showToast('오류: '+err.message,'error');})
-    .saveRecord(data);
+
+  const consultBlocks=collectTimeBlocks('consult');
+  const otherBlocks=collectTimeBlocks('other');
+
+  // 사진 업로드 (대표 기록에만)
+  let clockInPhoto='', clockOutPhoto='';
+  if(photoFiles.clockIn)  clockInPhoto =await uploadPhoto(photoFiles.clockIn,'clockIn');
+  if(photoFiles.clockOut) clockOutPhoto=await uploadPhoto(photoFiles.clockOut,'clockOut');
+
+  const base={activityDate:date,consultantName:name,campus:camp,fileName:'',fileUrl:''};
+  const records=[];
+  // 대표 기록: 출퇴근 + 첫 컨설팅 + 첫 컨설팅외
+  records.push(Object.assign({}, base, {
+    clockIn:document.getElementById('clockIn').value,
+    clockOut:document.getElementById('clockOut').value,
+    clockInPhoto, clockOutPhoto,
+    consultStart:consultBlocks[0]?consultBlocks[0].start:'', consultEnd:consultBlocks[0]?consultBlocks[0].end:'',
+    otherStart:otherBlocks[0]?otherBlocks[0].start:'', otherEnd:otherBlocks[0]?otherBlocks[0].end:''
+  }));
+  // 추가 컨설팅 블록 → 별도 행
+  for(let i=1;i<consultBlocks.length;i++){
+    records.push(Object.assign({}, base, {clockIn:'',clockOut:'',clockInPhoto:'',clockOutPhoto:'',consultStart:consultBlocks[i].start,consultEnd:consultBlocks[i].end,otherStart:'',otherEnd:''}));
+  }
+  // 추가 컨설팅외 블록 → 별도 행
+  for(let i=1;i<otherBlocks.length;i++){
+    records.push(Object.assign({}, base, {clockIn:'',clockOut:'',clockInPhoto:'',clockOutPhoto:'',consultStart:'',consultEnd:'',otherStart:otherBlocks[i].start,otherEnd:otherBlocks[i].end}));
+  }
+
+  // 순차 저장
+  let ok=0, fail=0;
+  const finish=()=>{
+    btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-paper-plane"></i> 저장';
+    if(fail===0){ showToast('✅ 활동 기록이 저장되었습니다! ('+ok+'건)','success'); resetForm(); loadPublicStats(); }
+    else showToast('일부 저장 실패 ('+ok+'건 성공 / '+fail+'건 실패)','error');
+  };
+  const saveOne=(i)=>{
+    if(i>=records.length){ finish(); return; }
+    google.script.run
+      .withSuccessHandler(res=>{ if(res&&res.success) ok++; else fail++; saveOne(i+1); })
+      .withFailureHandler(()=>{ fail++; saveOne(i+1); })
+      .saveRecord(records[i]);
+  };
+  saveOne(0);
 }
 
 function resetForm(){
-  ['activityDate','clockIn','clockOut','consultStart','consultEnd','otherStart','otherEnd'].forEach(id=>document.getElementById(id).value='');
+  ['activityDate','clockIn','clockOut','consultStart','consultEnd','otherStart','otherEnd'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   if(currentRole!=='consultant')document.getElementById('consultantName').value='';
   document.getElementById('campus').value='';
-  ['totalWork','totalConsult','totalOther'].forEach(id=>document.getElementById(id).textContent='시간 입력');
+  ['totalWork','totalConsult','totalOther'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='시간 입력';});
   clearPhoto('clockIn');clearPhoto('clockOut');
+  // 추가된 시간 블록 제거 (첫 블록만 남김)
+  ['consultBlocks','otherBlocks'].forEach(bid=>{
+    const box=document.getElementById(bid);
+    if(box){ const rows=box.querySelectorAll('.time-row-2'); rows.forEach((r,i)=>{ if(i>0) r.remove(); }); }
+  });
 }
 
 // ── 모달 ──────────────────────────────────────────
