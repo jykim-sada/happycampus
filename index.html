@@ -881,6 +881,12 @@ tr:hover td{background:#f0faf9}
         <button class="btn-logout" onclick="logout()">로그아웃</button>
       </div>
 
+      <!-- 서브탭: 작성 / 목록 -->
+      <div class="my-subtabs" id="arSubtabBar">
+        <button class="my-subtab active" id="subtabArWrite" onclick="switchArSubtab('write')"><i class="fa-solid fa-pen-to-square"></i> 작성</button>
+        <button class="my-subtab" id="subtabArList" onclick="switchArSubtab('list')"><i class="fa-solid fa-list"></i> 목록</button>
+      </div>
+
       <div class="card">
         <div class="card-title"><i class="fa-solid fa-file-lines"></i><span class="tab-label">활동 보고서</span> 작성</div>
         <div class="form-stack">
@@ -1126,6 +1132,11 @@ tr:hover td{background:#f0faf9}
 
     <!-- 로그인 된 경우 -->
     <div id="reportContent" style="display:none">
+      <!-- 서브탭: 작성 / 목록 -->
+      <div class="my-subtabs" id="rptSubtabBar" style="margin-top:0.5rem">
+        <button class="my-subtab active" id="subtabRptWrite" onclick="switchRptSubtab('write')"><i class="fa-solid fa-pen-to-square"></i> 작성</button>
+        <button class="my-subtab" id="subtabRptList" onclick="switchRptSubtab('list')"><i class="fa-solid fa-list"></i> 목록</button>
+      </div>
 
       <!-- ① 기본 정보 -->
       <div class="card">
@@ -1819,6 +1830,7 @@ function loadConsultantDropdowns(){
     '김인곤(남부)','김재엽(남부)','나숙자(남부)','신경숙(남부)','안주연(남부)',
     '유현(남부)','유환석(남부)','이종혁(남부)','이호진(남부)','이희숙(남부)',
     '전혜경(남부)','정옥주(남부)','최석규(남부)','최유정(남부)',
+    '안미경(남부)','유창석(남부)','정한열(남부)','최윤정(남부)',
     '행복캠퍼스'
   ];
   const fillDropdowns = (list) => {
@@ -1979,27 +1991,74 @@ function renderResvListSimple(list,el){
     el.innerHTML='<div class="no-resv">예약 내역이 없습니다</div>';return;
   }
   const statusColor={예약중:'#1565c0',완료:'#2e7d32',취소:'#c62828',노쇼:'#f57c00'};
-  const html=list.map(r=>`
-    <div class="card" style="margin-bottom:0.7rem;padding:14px 16px">
+  const ctOpt=(v)=>['오프라인','온라인','유선'].map(o=>`<option value="${o}" ${v===o?'selected':''}>${o}</option>`).join('');
+  const html=list.map(r=>{
+    const t=_fmtTimeKr(r.resvTime);
+    const memoV=(r.memo||'').replace(/"/g,'&quot;');
+    return `
+    <div class="card" id="resvS_${r.rowIndex}" style="margin-bottom:0.7rem;padding:14px 16px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="background:#e8f5e9;color:#1b5e20;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px">${r.resvDate}</span>
-        <span style="font-size:18px;font-weight:800;color:#1565c0">${r.resvTime}</span>
+        <span style="font-size:18px;font-weight:800;color:#1565c0">${t}</span>
         <span style="font-size:15px;font-weight:700">${r.clientName}</span>
         <span style="font-size:12px;color:#666">${r.session}</span>
         <span style="color:${statusColor[r.status]||'#666'};font-size:13px;font-weight:700;margin-left:auto">${r.status}</span>
       </div>
-      <div style="margin-top:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <span style="font-size:13px;color:#555">🕐 ${r.resvTime}${r.endTime?' ~ '+r.endTime:''}</span>
-        <span style="font-size:13px;color:#555">💬 ${r.consultType||'—'}</span>
-        ${r.campus?`<span style="font-size:13px;color:#555">📍 ${r.campus}</span>`:''}
-        ${r.durMin?`<span style="font-size:13px;color:#2e7d32;font-weight:700">⏱ ${r.durMin}분</span>`:''}
-        <button class="btn-resv-load" style="margin-left:auto;background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7"
-          onclick="goToReportFromResv('${r.resvDate}','${r.clientName}','${r.resvTime}','${r.session}','${r.consultType||''}')">
+      <div style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        ${['완료','취소','노쇼','예약중'].map(s=>`<button onclick="setResvStatus2(${r.rowIndex},'${s}')" style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;border:1.5px solid ${statusColor[s]};background:${r.status===s?statusColor[s]:'#fff'};color:${r.status===s?'#fff':statusColor[s]}">${s}</button>`).join('')}
+        ${r.campus?`<span style="font-size:12px;color:#555;margin-left:auto">📍 ${r.campus}</span>`:''}
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <select id="rs2ct_${r.rowIndex}" style="height:2.2rem;padding:0 8px;border:1.5px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:13px;background:#fff"><option value="">상담방식</option>${ctOpt(r.consultType)}</select>
+        <input id="rs2memo_${r.rowIndex}" placeholder="비고 메모" value="${memoV}" style="flex:1;min-width:120px;height:2.2rem;padding:0 8px;border:1.5px solid #c8e6c9;border-radius:8px;font-family:inherit;font-size:13px">
+        <button onclick="saveResvDetail2(${r.rowIndex})" style="height:2.2rem;padding:0 12px;border:none;border-radius:8px;background:#2e7d32;color:#fff;font-size:12px;font-weight:700;cursor:pointer">💾 저장</button>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-resv-load" style="background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7"
+          onclick="goToReportFromResv('${r.resvDate}','${r.clientName}','${t}','${r.session}','${r.consultType||''}')">
           <i class="fa-solid fa-file-medical"></i> 보고서 작성
         </button>
+        <button style="background:#fee2e2;color:#c62828;border:1.5px solid #fca5a5;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer" onclick="deleteResv2(${r.rowIndex})">
+          <i class="fa-solid fa-trash"></i> 예약 삭제
+        </button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   el.innerHTML=html;
+}
+
+// ── 예약관리 탭 예약현황: 상태변경 / 저장 / 삭제 ──
+function setResvStatus2(rowIndex,status){
+  google.script.run
+    .withSuccessHandler(res=>{
+      if(res&&res.success){ showToast('상태가 변경되었습니다','success'); loadResvListSimple(); }
+      else showToast('변경 실패: '+((res&&res.error)||''),'error');
+    })
+    .withFailureHandler(err=>showToast('변경 실패: '+err.message,'error'))
+    .updateReservation(rowIndex, currentUser, {status});
+}
+function saveResvDetail2(rowIndex){
+  const data={
+    consultType: document.getElementById('rs2ct_'+rowIndex)?.value||'',
+    memo:        document.getElementById('rs2memo_'+rowIndex)?.value||''
+  };
+  google.script.run
+    .withSuccessHandler(res=>{
+      if(res&&res.success) showToast('저장되었습니다','success');
+      else showToast('저장 실패: '+((res&&res.error)||''),'error');
+    })
+    .withFailureHandler(err=>showToast('저장 실패: '+err.message,'error'))
+    .updateReservation(rowIndex, currentUser, data);
+}
+function deleteResv2(rowIndex){
+  if(!confirm('이 예약을 삭제하시겠습니까?'))return;
+  google.script.run
+    .withSuccessHandler(res=>{
+      if(res&&res.success){ showToast('삭제되었습니다','success'); loadResvListSimple(); }
+      else showToast('삭제 실패: '+((res&&res.error)||''),'error');
+    })
+    .withFailureHandler(err=>showToast('삭제 실패: '+err.message,'error'))
+    .deleteReservation(rowIndex, currentUser);
 }
 
 function goToReportFromResv(date,client,time,session,consultType){
@@ -2053,7 +2112,40 @@ function refreshActreportPanel(){
   if(arToggle&&!arToggle.dataset.bound){ arToggle.dataset.bound='1';
     arToggle.addEventListener('click',()=>toggleListCollapse('arListBody','arListChevron'));
   }
+  // 활동일자 변경 시 해당 날짜의 컨설팅 외 시간 자동 채움
+  const arDateEl2=document.getElementById('arDate');
+  if(arDateEl2&&!arDateEl2.dataset.autofill){ arDateEl2.dataset.autofill='1';
+    arDateEl2.addEventListener('change', autoFillArFromRecord);
+  }
+  autoFillArFromRecord();
   loadActReports('all');
+  switchArSubtab('write');
+}
+
+// 해당 활동일자의 "컨설팅 외" 시작·종료 시간을 자동으로 채움 (비어있을 때만, 수정 가능)
+function autoFillArFromRecord(){
+  const date=document.getElementById('arDate')?.value;
+  if(!date||!currentUser)return;
+  // 수정 모드(기존 보고서 불러오기)일 땐 자동채움 안 함
+  const saveBtn=document.querySelector('#actreportContent .btn-submit');
+  if(saveBtn&&saveBtn.dataset.editRow)return;
+  google.script.run
+    .withSuccessHandler(rawRes=>{
+      const res=typeof rawRes==='string'?JSON.parse(rawRes):rawRes;
+      if(!res||!res.success||!res.records)return;
+      const rec=res.records.find(r=>fmtDateStr(r.activityDate)===date);
+      if(!rec)return;
+      const st=document.getElementById('arStartTime');
+      const en=document.getElementById('arEndTime');
+      const pl=document.getElementById('arPlace');
+      let filled=false;
+      if(st&&!st.value&&rec.otherStart){ st.value=rec.otherStart; filled=true; }
+      if(en&&!en.value&&rec.otherEnd){ en.value=rec.otherEnd; filled=true; }
+      if(pl&&!pl.value&&rec.campus){ pl.value=rec.campus; }
+      calcArDuration();
+      if(filled) showToast('해당 날짜의 컨설팅 외 시간을 불러왔습니다 (수정 가능)','success');
+    })
+    .getMyRecordsWithReports(currentUser);
 }
 
 function calcArDuration(){
@@ -2067,6 +2159,34 @@ function calcArDuration(){
   if(diff<0)diff+=1440;
   const h=Math.floor(diff/60),m=diff%60;
   el.textContent=`활동시간: ${h>0?h+'시간 ':''}${m>0?m+'분':''}  (${s} ~ ${e})`;
+}
+
+// ── 보고서 탭: 작성/목록 서브탭 전환 (기존 폼 구조 그대로, 보이기/숨기기만) ──
+function switchArSubtab(tab){
+  const cont=document.getElementById('actreportContent');
+  if(!cont)return;
+  const listCard=document.getElementById('arListToggle')?.closest('.card');
+  Array.from(cont.children).forEach(ch=>{
+    if(ch.id==='arSubtabBar'||ch.classList.contains('login-banner'))return;
+    if(ch===listCard) ch.style.display=tab==='list'?'':'none';
+    else ch.style.display=tab==='write'?'':'none';
+  });
+  document.getElementById('subtabArWrite')?.classList.toggle('active',tab==='write');
+  document.getElementById('subtabArList')?.classList.toggle('active',tab==='list');
+  if(tab==='list') loadActReports('all');
+}
+function switchRptSubtab(tab){
+  const cont=document.getElementById('reportContent');
+  if(!cont)return;
+  const listCard=document.getElementById('myRptListCard');
+  Array.from(cont.children).forEach(ch=>{
+    if(ch.id==='rptSubtabBar'||ch.classList.contains('login-banner'))return;
+    if(ch===listCard) ch.style.display=tab==='list'?'':'none';
+    else ch.style.display=tab==='write'?'':'none';
+  });
+  document.getElementById('subtabRptWrite')?.classList.toggle('active',tab==='write');
+  document.getElementById('subtabRptList')?.classList.toggle('active',tab==='list');
+  if(tab==='list') loadMyRptList('all');
 }
 
 function submitActReport(){
@@ -2878,6 +2998,9 @@ function downloadRptReport(r){
 function openRptReportEdit(r){
   // 상담보고서 탭으로 이동 → 폼에 기존 데이터 채우기
   switchTab('report');
+  // 즉시 수정모드 표시 (폼 채우기 전에 빠르게 저장 눌러도 새 복사 안 되도록)
+  const _rptBtn=document.getElementById('rptSubmitBtn');
+  if(_rptBtn) _rptBtn.dataset.editRow=r.rowIndex;
   setTimeout(()=>{
     document.getElementById('rptDate').value = r.resvDate || '';
     document.getElementById('rptClientManual').value = r.clientName || '';
@@ -2984,6 +3107,7 @@ function refreshReportPanel(){
   }
   // 상담 보고서 목록 자동 로드
   loadMyRptList('all');
+  switchRptSubtab('write');
 }
 
 
@@ -3103,14 +3227,19 @@ function submitReport(){
   };
   const onDone=(res, successMsg, failPrefix)=>{
     btn.disabled=false;
-    btn.innerHTML='<i class="fa-solid fa-file-circle-check"></i> 보고서 저장';
-    btn.style.background='';
-    delete btn.dataset.editRow;
     if(res&&res.success){
+      btn.innerHTML='<i class="fa-solid fa-file-circle-check"></i> 보고서 저장';
+      btn.style.background='';
+      delete btn.dataset.editRow;
       showToast(successMsg,'success');
       resetRptForm();
       loadMyRptList();
-    } else showToast(failPrefix+': '+((res&&res.error)||''),'error');
+    } else {
+      // 실패 시 수정모드 그대로 유지 → 다시 눌러도 새 복사 안 생기고 덮어쓰기 재시도
+      if(btn.dataset.editRow){ btn.innerHTML='<i class="fa-solid fa-rotate"></i> 보고서 수정 저장'; btn.style.background='#f57c00'; }
+      else { btn.innerHTML='<i class="fa-solid fa-file-circle-check"></i> 보고서 저장'; }
+      showToast(failPrefix+': '+((res&&res.error)||''),'error');
+    }
   };
   const onFail=(err)=>{
     btn.disabled=false;
@@ -3955,10 +4084,10 @@ function renderMyTable(records){
     body.innerHTML='<tr><td colspan="8" class="no-data"><i class="fa-solid fa-inbox"></i>기록이 없습니다.</td></tr>';return;
   }
   body.innerHTML=records.map(r=>{
-    const isToday=r.submitTime&&r.submitTime.substring(0,10)===today;
-    const actions=isToday
+    const canEdit=isWithin7Days(r.submitTime);
+    const actions=canEdit
       ?'<button class="btn-edit" onclick=\'openEdit('+JSON.stringify(r)+')\'>수정</button><button class="btn-del" onclick="doDelete('+r.rowIndex+')">삭제</button>'
-      :'<span style="color:#94a3b8;font-size:12px">당일만 가능</span>';
+      :'<span style="color:#94a3b8;font-size:12px">7일 지남</span>';
 
     // 컨설팅 시간 있으면 → 상담보고서 배지
     const rptBadges=(r.relatedRpt||[]).map(rpt=>
